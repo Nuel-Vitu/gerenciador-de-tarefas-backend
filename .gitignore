@@ -1,0 +1,7 @@
+# .gitignore
+
+# Dependências
+node_modules
+
+# Arquivo de ambiente com senhas
+.env

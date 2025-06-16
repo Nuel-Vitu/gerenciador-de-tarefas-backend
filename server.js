@@ -2,6 +2,8 @@
 // Este servidor permite que usuários se registrem, façam login e gerenciem suas tarefas.
 
 // --- Ferramentas ---
+require('dotenv').config();
+
 const express = require('express');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
@@ -10,17 +12,16 @@ const cors = require('cors');
 
 // --- Configurações ---
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 app.use(express.json()); // Middleware para entender JSON
 app.use(cors()); // Middleware para permitir CORS
 
 // --- Configuração da Conexão com o PostgreSQL ---
 const pool = new Pool({
-    user: 'postgres',
-    host: 'localhost',
-    database: 'gerenciador_de_tarefas',
-    password: 'Vtrbt9963', // <-- LEMBRE-SE DE USAR A SUA SENHA
-    port: 5432,
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false // Necessário para conexões em alguns ambientes de produção
+    }
 });
 
 // --- Middleware de Autenticação ---
@@ -29,7 +30,7 @@ function verificarToken(req, res, next) {
     const token = authHeader && authHeader.split(' ')[1];
     if (token == null) return res.sendStatus(401);
 
-    jwt.verify(token, 'seu_segredo_jwt', (err, usuario) => {
+    jwt.verify(token, process.env.JWT_SECRET, (err, usuario) => {
         if (err) return res.sendStatus(403);
         req.idDoUsuario = usuario.id;
         next();
@@ -79,7 +80,8 @@ app.post('/api/auth/login', async (req, res) => {
         if (!senhaValida) {
             return res.status(401).json({ error: "Credenciais inválidas." });
         }
-        const token = jwt.sign({ id: usuario.id }, 'seu_segredo_jwt', { expiresIn: '1h' });
+
+        const token = jwt.sign({ id: usuario.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
         res.json({ token });
     } catch (error) {
         console.error('Erro no login:', error);
