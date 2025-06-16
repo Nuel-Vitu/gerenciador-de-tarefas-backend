@@ -105,11 +105,11 @@ app.get('/api/tarefas', verificarToken, async (req, res) => {
 // Rota para Criar uma nova tarefa para o usuário logado
 app.post('/api/tarefas', verificarToken, async (req, res) => {
     try {
-        const { texto, prazo } = req.body;
+        const { texto, prazo, prioridade } = req.body;
         if (!texto) {
             return res.status(400).json({ error: 'O campo texto é obrigatório.' });
         }
-        const novaTarefa = await pool.query("INSERT INTO tarefas (texto, prazo, usuario_id) VALUES ($1, $2, $3) RETURNING *", [texto, prazo, req.idDoUsuario]);
+        const novaTarefa = await pool.query("INSERT INTO tarefas (texto, prazo, usuario_id, prioridade) VALUES ($1, $2, $3, $4) RETURNING *", [texto, prazo, req.idDoUsuario, prioridade]);
         res.status(201).json(novaTarefa.rows[0]);
     } catch (error) {
         console.error('Erro ao inserir tarefa:', error);
