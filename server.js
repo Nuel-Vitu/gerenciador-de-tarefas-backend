@@ -162,6 +162,7 @@ app.delete('/api/tarefas/:id', verificarToken, async (req, res) => {
 
 
 // --- Ligar o Servidor ---
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}. Acesse http://localhost:${PORT}`);
+// A linha corrigida para produção
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
