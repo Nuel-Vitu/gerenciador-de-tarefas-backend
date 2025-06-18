@@ -9,7 +9,7 @@ const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
-
+const crypto = require('crypto');
 // --- Configurações ---
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -85,6 +85,40 @@ app.post('/api/auth/login', async (req, res) => {
         res.json({ token });
     } catch (error) {
         console.error('Erro no login:', error);
+        res.status(500).send('Erro no servidor.');
+    }
+});
+
+// =================================================================
+// ROTA PARA REDEFINIÇÃO DE SENHA
+// =================================================================    
+
+app.post('api/auth/forgot-password', async (req, res) => {
+    try{
+        const { email } = req.body;
+
+        const resultadoUsuario = await pool.query("SELECT * FROM usuarios WHERE email = $1", [email]);
+        if (resultadoUsuario.rows.length === 0) {
+            return res.json({ message: "Se um usuário com este e-mail existir, um link de redefinição será enviado."});
+        }
+
+        const usuario = resultadoUsuario.rows[0];
+
+        const resetToken = crypto.randomBytes(32).toString('hex');
+
+        const tokenExpires = new Date(Date.now() + 3600000);
+
+        await pool.query(
+            "UPDATE usuarios SET reset_token = $1, reset_token_expires = $2 WHERE id = $3", 
+            [resetToken, tokenExpires, usuario.id]);
+
+            console.log(`Link de Redefinição para ${usuario.email}: http://localhost:3000/reset-password?token=${resetToken}`);
+            console.log(`Token: ${resetToken}`);
+
+            res.json({ message: "Se um usuário com este e-mail existir, um link de redefinição será enviado." });
+
+    } catch (error) {
+        console.error('Erro em forgot-password:', error);
         res.status(500).send('Erro no servidor.');
     }
 });
