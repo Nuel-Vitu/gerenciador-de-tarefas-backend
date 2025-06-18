@@ -17,12 +17,20 @@ app.use(express.json()); // Middleware para entender JSON
 app.use(cors()); // Middleware para permitir CORS
 
 // --- Configuração da Conexão com o PostgreSQL ---
-const pool = new Pool({
+// Cria o objeto de configuração inicial
+const poolConfig = {
     connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false // Necessário para conexões em alguns ambientes de produção
-    }
-});
+};
+
+// Adiciona a configuração de SSL SOMENTE se estivermos em produção (no Render)
+if (process.env.NODE_ENV === "production") {
+    poolConfig.ssl = {
+        rejectUnauthorized: false
+    };
+}
+
+// Cria o pool com a configuração final, que agora é flexível
+const pool = new Pool(poolConfig);
 
 // --- Middleware de Autenticação ---
 function verificarToken(req, res, next) {
@@ -90,10 +98,10 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // =================================================================
-// ROTA PARA REDEFINIÇÃO DE SENHA
+// ROTA PARA REDEFINIÇÃO DE SENHA - CRIAÇÃO DE TOKEN DE REDEFINIÇÃO
 // =================================================================    
 
-app.post('api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', async (req, res) => {
     try{
         const { email } = req.body;
 
@@ -122,6 +130,49 @@ app.post('api/auth/forgot-password', async (req, res) => {
         res.status(500).send('Erro no servidor.');
     }
 });
+
+// REDEFINIÇÃO DE SENHA - ROTA PARA ATUALIZAR A SENHA
+
+app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+        const { token, novaSenha } = req.body;
+
+        if (!token || !novaSenha) {
+            return res.status(400).json({ error: "O token e a nova senha são obrigatórios." });
+        }
+
+        const resultadoUsuario = await pool.query(
+            "SELECT * FROM usuarios WHERE reset_token = $1 AND reset_token_expires > NOW()",
+            [token]
+        );
+
+        if (resultadoUsuario.rows.length === 0) {
+            return res.status(400).json({ error: "Token inválido ou expirado." });
+        }
+
+        const usuario = resultadoUsuario.rows[0];
+
+        
+        // 1. Hasheia a nova senha
+        const salt = await bcrypt.genSalt(10);
+        const senhaHash = await bcrypt.hash(novaSenha, salt);
+
+        // 2. Atualiza a senha do usuário e LIMPA os campos de redefinição para invalidar o token
+        await pool.query(
+            "UPDATE usuarios SET senha = $1, reset_token = NULL, reset_token_expires = NULL WHERE id = $2",
+            [senhaHash, usuario.id]
+        );
+
+        // 3. Envia a resposta final de sucesso
+        res.json({ message: "Senha redefinida com sucesso." });
+        // ------------------------------------
+
+    } catch (error) {
+        console.error('Erro em reset-password:', error);
+        res.status(500).send('Erro no servidor.');
+    }
+});
+
 
 // ROTA PARA BUSCAR DADOS DO USUÁRIO LOGADO
 app.get('/api/auth/me', verificarToken, async (req, res) => {
