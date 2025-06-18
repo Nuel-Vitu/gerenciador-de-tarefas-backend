@@ -44,15 +44,15 @@ function verificarToken(req, res, next) {
 // ROTA PARA CADASTRAR (POST) UM NOVO USUÁRIO
 app.post('/api/auth/register', async (req, res) => {
     try {
-        const { email, senha } = req.body;
-        if (!email || !senha) {
-            return res.status(400).json({ error: "E-mail e senha são obrigatórios." });
+        const { email, senha, nome} = req.body;
+        if (!email || !senha || !nome) {
+            return res.status(400).json({ error: "Nome, e-mail e senha são obrigatórios." });
         }
         const salt = await bcrypt.genSalt(10);
         const senhaHash = await bcrypt.hash(senha, salt);
         const novoUsuario = await pool.query(
-            "INSERT INTO usuarios (email, senha) VALUES ($1, $2) RETURNING id, email",
-            [email, senhaHash]
+            "INSERT INTO usuarios (nome, email, senha) VALUES ($1, $2, $3) RETURNING id, email, nome",
+            [nome, email, senhaHash]
         );
         res.status(201).json(novoUsuario.rows[0]);
     } catch (error) {
@@ -85,6 +85,30 @@ app.post('/api/auth/login', async (req, res) => {
         res.json({ token });
     } catch (error) {
         console.error('Erro no login:', error);
+        res.status(500).send('Erro no servidor.');
+    }
+});
+
+// ROTA PARA BUSCAR DADOS DO USUÁRIO LOGADO
+app.get('/api/auth/me', verificarToken, async (req, res) => {
+    try {
+        const resultadoUsuario = await pool.query(
+            "SELECT id, email, nome FROM usuarios WHERE id = $1", 
+            [req.idDoUsuario]
+        );
+
+        if (resultadoUsuario.rows.length === 0) {
+            return res.status(404).json({ error: "Usuário não encontrado." });
+        }
+        
+        const usuario = resultadoUsuario.rows[0];
+        res.json({ 
+            nome: usuario.nome, 
+            email: usuario.email 
+        });
+
+    } catch (error) {
+        console.error('Erro ao buscar dados do usuário:', error);
         res.status(500).send('Erro no servidor.');
     }
 });
